@@ -40,7 +40,7 @@ typedef struct moti0ntrails_instance
 
   uint32_t* previous_frames[MAX_NUM_FRAMES];
 
-  float frame_ratios[MAX_NUM_FRAMES];
+  double frame_ratios[MAX_NUM_FRAMES];
   unsigned int framebuffer_index;
 
   unsigned int num_frames;
@@ -53,7 +53,7 @@ typedef struct moti0ntrails_instance
 void update_ratios(moti0ntrails_instance_t *inst)
 {
   unsigned int i = 0;
-  float ratio = inst->starting_ratio;
+  double ratio = inst->starting_ratio;
   for(i = 0; i < inst->num_frames; ++i)
   {
     inst->frame_ratios[i] = ratio;
@@ -227,8 +227,8 @@ void f0r_update(f0r_instance_t instance, double time,
   memcpy(outframe, inframe, frame_bytes);
   for(frames_processed = 0; frames_processed < inst->num_frames; ++frames_processed)
   {
-    float old_ratio = inst->frame_ratios[frames_processed];
-    float new_ratio = 1.0f - old_ratio;
+    double old_ratio = inst->frame_ratios[frames_processed];
+    double new_ratio = 1.0f - old_ratio;
 
     for(unsigned int i = 0; i < frame_size; ++i)
     {
