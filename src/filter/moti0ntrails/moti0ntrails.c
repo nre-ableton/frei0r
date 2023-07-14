@@ -18,7 +18,6 @@
  */
 
 #include <stdlib.h>
-#include <stdio.h>
 #if defined(_MSC_VER)
 #define _USE_MATH_DEFINES
 #endif /* _MSC_VER */
@@ -90,7 +89,7 @@ void f0r_get_plugin_info(f0r_plugin_info_t* info)
   info->frei0r_version = FREI0R_MAJOR_VERSION;
   info->major_version = 0;
   info->minor_version = 0;
-  info->num_params = 3;
+  info->num_params = 4;
   info->explanation = "Add motion trails to video";
 }
 
@@ -170,24 +169,19 @@ void f0r_set_param_value(f0r_instance_t instance,
   switch(param_index)
   {
   case 0:
-    inst->num_frames = (unsigned int)(*((double*)param) * MAX_NUM_FRAMES);
-    printf("Set num frames to %d\n", inst->num_frames);
+    inst->num_frames = map_value_forward(*((double*)param), MAX_NUM_FRAMES, 0);
     update_ratios(instance);
     break;
   case 1:
     inst->starting_ratio = *((double*)param);
-    printf("Set starting ratio to %f\n", inst->starting_ratio);
     update_ratios(instance);
     break;
   case 2:
     inst->decay_amount = *((double*)param);
-    printf("Set decay amount to %f\n", inst->decay_amount);
     update_ratios(instance);
     break;
   case 3:
     inst->exponential_decay = map_value_forward(*((double*)param), 1.0, 0.0);//BOOL!!
-    if (inst->exponential_decay) { printf("Using exponential decay\n"); }
-    else { printf("Nope, linear decay is a-ok\n"); }
     update_ratios(instance);
     break;
   }
@@ -202,7 +196,7 @@ void f0r_get_param_value(f0r_instance_t instance,
   switch(param_index)
   {
   case 0:
-    *((double*)param) = inst->num_frames;
+    *((double*)param) = map_value_backward(inst->num_frames, 0.0, MAX_NUM_FRAMES);
     break;
   case 1:
     *((double*)param) = inst->starting_ratio;
@@ -211,7 +205,7 @@ void f0r_get_param_value(f0r_instance_t instance,
     *((double*)param) = inst->decay_amount;
     break;
   case 3:
-    *((double*)param) = map_value_backward(inst->exponential_decay, 1.0, 0.0);//BOOL!!
+    *((double*)param) = map_value_backward(inst->exponential_decay, 0.0, 1.0);//BOOL!!
     break;
   }
 }
