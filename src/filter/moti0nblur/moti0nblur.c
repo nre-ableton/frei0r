@@ -138,16 +138,16 @@ void f0r_update(f0r_instance_t instance, double time,
     for(unsigned int i = 0; i < frame_size; ++i)
     {
       const uint32_t* old_frame = inst->previous_frames[frame_index];
-      r = (double)(old_frame[i] >> 24 & 0x000000ff);
-      g = (double)(old_frame[i] >> 16 & 0x000000ff);
-      b = (double)(old_frame[i] >> 8 & 0x000000ff);
-      a = (double)(old_frame[i] & 0x000000ff);
+      a = (double)(old_frame[i] >> 24 & 0x000000ff);
+      b = (double)(old_frame[i] >> 16 & 0x000000ff);
+      g = (double)(old_frame[i] >> 8 & 0x000000ff);
+      r = (double)(old_frame[i] & 0x000000ff);
 
       uint32_t out_pixel = (
-        ((unsigned char)(r * inst->frame_ratios[frames_processed]) << 24) +
-        ((unsigned char)(g * inst->frame_ratios[frames_processed]) << 16) +
-        ((unsigned char)(b * inst->frame_ratios[frames_processed]) << 8) +
-        0x000000ff
+        ((unsigned char)(a * inst->frame_ratios[frames_processed]) << 24) +
+        ((unsigned char)(b * inst->frame_ratios[frames_processed]) << 16) +
+        ((unsigned char)(g * inst->frame_ratios[frames_processed]) << 8) +
+        ((unsigned char)r & 0x000000ff)
       );
       outframe[i] += out_pixel;
     }
