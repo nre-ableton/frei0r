@@ -1,0 +1,2 @@
+export FREI0R_PATH=$PWD/build/src/filter/moti0nblur
+rm pigeon.mp4 && ffmpeg -i pigeon_-_5938\ \(540p\).mp4 -vf frei0r=moti0nblur -t 1 pigeon.mp4 && open pigeon.mp4
