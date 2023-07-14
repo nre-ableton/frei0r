@@ -28,7 +28,8 @@
 
 #include "frei0r.h"
 
-#define NUM_FRAMES 4
+#define NUM_FRAMES 10
+#define STARTING_RATIO 0.5f
 
 typedef struct moti0nblur_instance
 {
@@ -43,12 +44,15 @@ typedef struct moti0nblur_instance
 void update_ratios(moti0nblur_instance_t *inst)
 {
   unsigned int i = 0;
-  float current_ratio = 0.75f;
+  float ratio = STARTING_RATIO;
   for(i = 0; i < NUM_FRAMES; ++i)
   {
-    inst->frame_ratios[i] = current_ratio;
+    inst->frame_ratios[i] = ratio;
     printf("RATIO %d: %f\n", i, inst->frame_ratios[i]);
-    current_ratio = current_ratio / 2.0f;
+    ratio -= 0.05f;
+    if(ratio < 0.0) {
+      ratio = 0.0f;
+    }
   }
 }
 
@@ -131,38 +135,57 @@ void f0r_update(f0r_instance_t instance, double time,
   unsigned int frame_index = inst->framebuffer_index;
   const unsigned char* pixel = 0;
   double r, g, b, a = 0.0;
+  double r_old, g_old, b_old, a_old = 0.0;
+  double r_blend, g_blend, b_blend, a_blend = 0.0;
   const unsigned int frame_size = inst->width * inst->height;
   memcpy(outframe, inframe, frame_size * sizeof(uint32_t));
   for(frames_processed = 0; frames_processed < NUM_FRAMES; ++frames_processed)
   {
+    float old_ratio = inst->frame_ratios[frames_processed];
+    float new_ratio = 1.0f - old_ratio;
+
     for(unsigned int i = 0; i < frame_size; ++i)
     {
+      a = (double)((outframe[i] >> 24) & 0xff);
+      b = (double)((outframe[i] >> 16) & 0xff);
+      g = (double)((outframe[i] >> 8) & 0xff);
+      r = (double)(outframe[i] & 0xff);
+
       const uint32_t* old_frame = inst->previous_frames[frame_index];
-      a = (double)(old_frame[i] >> 24 & 0x000000ff);
-      b = (double)(old_frame[i] >> 16 & 0x000000ff);
-      g = (double)(old_frame[i] >> 8 & 0x000000ff);
-      r = (double)(old_frame[i] & 0x000000ff);
+      a_old = (double)((old_frame[i] >> 24) & 0xff);
+      b_old = (double)((old_frame[i] >> 16) & 0xff);
+      g_old = (double)((old_frame[i] >> 8) & 0xff);
+      r_old = (double)(old_frame[i] & 0xff);
+
+      a_blend = (a * new_ratio + a_old * old_ratio);
+      if (a_blend > 255.0) { a_blend = 255.0; }
+      b_blend = (b * new_ratio + b_old * old_ratio);
+      if (b_blend > 255.0) { b_blend = 255.0; }
+      g_blend = (g * new_ratio + g_old * old_ratio);
+      if (g_blend > 255.0) { g_blend = 255.0; }
+      r_blend = (r * new_ratio + r_old * old_ratio);
+      if (r_blend > 255.0) { r_blend = 255.0; }
 
       uint32_t out_pixel = (
-        ((unsigned char)(a * inst->frame_ratios[frames_processed]) << 24) +
-        ((unsigned char)(b * inst->frame_ratios[frames_processed]) << 16) +
-        ((unsigned char)(g * inst->frame_ratios[frames_processed]) << 8) +
-        ((unsigned char)r & 0x000000ff)
+        ((uint8_t)a_blend << 24) |
+        ((uint8_t)b_blend << 16) |
+        ((uint8_t)g_blend << 8) |
+        (uint8_t)r_blend
       );
-      outframe[i] += out_pixel;
+      outframe[i] = out_pixel;
     }
 
     if(frame_index-- == 0)
     {
       frame_index = NUM_FRAMES - 1;
     }
-
-    if(++inst->framebuffer_index == NUM_FRAMES)
-    {
-      inst->framebuffer_index = 0;
-    }
-
-    memcpy(inst->previous_frames[inst->framebuffer_index], inframe,
-          frame_size * sizeof(uint32_t));
   }
+
+  if(++inst->framebuffer_index == NUM_FRAMES)
+  {
+    inst->framebuffer_index = 0;
+  }
+
+  memcpy(inst->previous_frames[inst->framebuffer_index], inframe,
+         frame_size * sizeof(uint32_t));
 }
