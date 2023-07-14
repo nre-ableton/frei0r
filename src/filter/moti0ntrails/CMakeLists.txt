@@ -1,5 +1,5 @@
-set (SOURCES moti0nblur.c)
-set (TARGET moti0nblur)
+set (SOURCES moti0ntrails.c)
+set (TARGET moti0ntrails)
 
 if (MSVC)
   set (SOURCES ${SOURCES} ${FREI0R_DEF})

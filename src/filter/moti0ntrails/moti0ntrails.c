@@ -1,4 +1,4 @@
-/* moti0nblur.c
+/* moti0ntrails.c
  * Copyright (C) 2005 Jean-Sebastien Senecal (Drone)
  * This file is a Frei0r plugin.
  *
@@ -28,30 +28,47 @@
 
 #include "frei0r.h"
 
-#define NUM_FRAMES 10
-#define STARTING_RATIO 0.5f
+#define MAX_NUM_FRAMES 60
+#define DEFAULT_NUM_FRAMES 5
+#define DEFAULT_STARTING_RATIO 0.5f
+#define DEFAULT_DECAY_AMOUNT 0.5f
 
-typedef struct moti0nblur_instance
+
+typedef struct moti0ntrails_instance
 {
   unsigned int width;
   unsigned int height;
-  uint32_t* previous_frames[NUM_FRAMES];
-  float frame_ratios[NUM_FRAMES];
+
+  uint32_t* previous_frames[MAX_NUM_FRAMES];
+
+  float frame_ratios[MAX_NUM_FRAMES];
   unsigned int framebuffer_index;
-} moti0nblur_instance_t;
+
+  unsigned int num_frames;
+  double starting_ratio;
+  double decay_amount;
+  short exponential_decay;
+} moti0ntrails_instance_t;
 
 /* Calculate the frame ratios. */
-void update_ratios(moti0nblur_instance_t *inst)
+void update_ratios(moti0ntrails_instance_t *inst)
 {
   unsigned int i = 0;
-  float ratio = STARTING_RATIO;
-  for(i = 0; i < NUM_FRAMES; ++i)
+  float ratio = inst->starting_ratio;
+  for(i = 0; i < inst->num_frames; ++i)
   {
     inst->frame_ratios[i] = ratio;
-    printf("RATIO %d: %f\n", i, inst->frame_ratios[i]);
-    ratio -= 0.05f;
-    if(ratio < 0.0) {
-      ratio = 0.0f;
+    if(inst->exponential_decay)
+    {
+      ratio *= (1.0f - inst->decay_amount);
+    }
+    else
+    {
+      ratio -= inst->decay_amount;
+      if(ratio < 0.0f)
+      {
+        ratio = 0.0f;
+      }
     }
   }
 }
@@ -66,15 +83,15 @@ void f0r_deinit()
 
 void f0r_get_plugin_info(f0r_plugin_info_t* info)
 {
-  info->name = "Moti0nblur";
+  info->name = "moti0ntrails";
   info->author = "Nik Reiman";
   info->plugin_type = F0R_PLUGIN_TYPE_FILTER;
   info->color_model = F0R_COLOR_MODEL_RGBA8888;
   info->frei0r_version = FREI0R_MAJOR_VERSION;
   info->major_version = 0;
   info->minor_version = 0;
-  info->num_params =  1;
-  info->explanation = "";
+  info->num_params = 3;
+  info->explanation = "Add motion trails to video";
 }
 
 void f0r_get_param_info(f0r_param_info_t* info, int param_index)
@@ -82,54 +99,128 @@ void f0r_get_param_info(f0r_param_info_t* info, int param_index)
   switch(param_index)
   {
   case 0:
-    info->name = "Name";
+    info->name = "Num frames";
     info->type = F0R_PARAM_DOUBLE;
-    info->explanation = "";
+    info->explanation = "Number of frames to use in the delay buffer";
+    break;
+  case 1:
+    info->name = "Starting ratio";
+    info->type = F0R_PARAM_DOUBLE;
+    info->explanation = "Amount of transparency to apply to the first delayed frame";
+    break;
+  case 2:
+    info->name = "Decay amount";
+    info->type = F0R_PARAM_DOUBLE;
+    info->explanation = "Amount to decrease transparency for each subsequent frame";
+    break;
+  case 3:
+    info->name = "Decay type";
+    info->type = F0R_PARAM_BOOL;
+    info->explanation ="If true, use exponential decay, otherwise use linear decay";
     break;
   }
 }
 
 f0r_instance_t f0r_construct(unsigned int width, unsigned int height)
 {
-  moti0nblur_instance_t* inst = (moti0nblur_instance_t*)calloc(1, sizeof(*inst));
+  moti0ntrails_instance_t* inst = (moti0ntrails_instance_t*)calloc(1, sizeof(*inst));
   inst->framebuffer_index = 0;
   inst->width = width;
   inst->height = height;
-  update_ratios(inst);
-  for(unsigned int i = 0; i < NUM_FRAMES; ++i) {
+  for(unsigned int i = 0; i < MAX_NUM_FRAMES; ++i) {
     inst->previous_frames[i] = (uint32_t*)malloc(width * height * sizeof(uint32_t));
   }
+
+  inst->num_frames = DEFAULT_NUM_FRAMES;
+  inst->starting_ratio = DEFAULT_STARTING_RATIO;
+  inst->decay_amount = DEFAULT_DECAY_AMOUNT;
+  inst->exponential_decay = 0;
+  update_ratios(inst);
+
   return (f0r_instance_t)inst;
 }
 
 void f0r_destruct(f0r_instance_t instance)
 {
-  moti0nblur_instance_t* inst = (moti0nblur_instance_t*)instance;
-  for(unsigned int i = 0; i < NUM_FRAMES; ++i) {
+  moti0ntrails_instance_t* inst = (moti0ntrails_instance_t*)instance;
+  for(unsigned int i = 0; i < MAX_NUM_FRAMES; ++i)
+  {
     free(inst->previous_frames[i]);
   }
   free(instance);
+}
+
+//stretch [0...1] to parameter range [min...max] linear
+float map_value_forward(double v, float min, float max)
+{
+	return min+(max-min)*v;
+}
+
+//collapse from parameter range [min...max] to [0...1] linear
+double map_value_backward(float v, float min, float max)
+{
+	return (v-min)/(max-min);
 }
 
 void f0r_set_param_value(f0r_instance_t instance, 
                          f0r_param_t param, int param_index)
 {
   assert(instance);
-  moti0nblur_instance_t* inst = (moti0nblur_instance_t*)instance;
+  moti0ntrails_instance_t* inst = (moti0ntrails_instance_t*)instance;
+  switch(param_index)
+  {
+  case 0:
+    inst->num_frames = (unsigned int)(*((double*)param) * MAX_NUM_FRAMES);
+    printf("Set num frames to %d\n", inst->num_frames);
+    update_ratios(instance);
+    break;
+  case 1:
+    inst->starting_ratio = *((double*)param);
+    printf("Set starting ratio to %f\n", inst->starting_ratio);
+    update_ratios(instance);
+    break;
+  case 2:
+    inst->decay_amount = *((double*)param);
+    printf("Set decay amount to %f\n", inst->decay_amount);
+    update_ratios(instance);
+    break;
+  case 3:
+    inst->exponential_decay = map_value_forward(*((double*)param), 1.0, 0.0);//BOOL!!
+    if (inst->exponential_decay) { printf("Using exponential decay\n"); }
+    else { printf("Nope, linear decay is a-ok\n"); }
+    update_ratios(instance);
+    break;
+  }
 }
 
 void f0r_get_param_value(f0r_instance_t instance,
                          f0r_param_t param, int param_index)
 {
   assert(instance);
-  moti0nblur_instance_t* inst = (moti0nblur_instance_t*)instance;
+  moti0ntrails_instance_t* inst = (moti0ntrails_instance_t*)instance;
+
+  switch(param_index)
+  {
+  case 0:
+    *((double*)param) = inst->num_frames;
+    break;
+  case 1:
+    *((double*)param) = inst->starting_ratio;
+    break;
+  case 2:
+    *((double*)param) = inst->decay_amount;
+    break;
+  case 3:
+    *((double*)param) = map_value_backward(inst->exponential_decay, 1.0, 0.0);//BOOL!!
+    break;
+  }
 }
 
 void f0r_update(f0r_instance_t instance, double time,
                 const uint32_t* inframe, uint32_t* outframe)
 {
   assert(instance);
-  moti0nblur_instance_t* inst = (moti0nblur_instance_t*)instance;
+  moti0ntrails_instance_t* inst = (moti0ntrails_instance_t*)instance;
 
   unsigned int frames_processed = 0;
   unsigned int frame_index = inst->framebuffer_index;
@@ -138,8 +229,9 @@ void f0r_update(f0r_instance_t instance, double time,
   double r_old, g_old, b_old, a_old = 0.0;
   double r_blend, g_blend, b_blend, a_blend = 0.0;
   const unsigned int frame_size = inst->width * inst->height;
-  memcpy(outframe, inframe, frame_size * sizeof(uint32_t));
-  for(frames_processed = 0; frames_processed < NUM_FRAMES; ++frames_processed)
+  const size_t frame_bytes = frame_size * sizeof(uint32_t);
+  memcpy(outframe, inframe, frame_bytes);
+  for(frames_processed = 0; frames_processed < inst->num_frames; ++frames_processed)
   {
     float old_ratio = inst->frame_ratios[frames_processed];
     float new_ratio = 1.0f - old_ratio;
@@ -158,13 +250,9 @@ void f0r_update(f0r_instance_t instance, double time,
       r_old = (double)(old_frame[i] & 0xff);
 
       a_blend = (a * new_ratio + a_old * old_ratio);
-      if (a_blend > 255.0) { a_blend = 255.0; }
       b_blend = (b * new_ratio + b_old * old_ratio);
-      if (b_blend > 255.0) { b_blend = 255.0; }
       g_blend = (g * new_ratio + g_old * old_ratio);
-      if (g_blend > 255.0) { g_blend = 255.0; }
       r_blend = (r * new_ratio + r_old * old_ratio);
-      if (r_blend > 255.0) { r_blend = 255.0; }
 
       uint32_t out_pixel = (
         ((uint8_t)a_blend << 24) |
@@ -177,15 +265,14 @@ void f0r_update(f0r_instance_t instance, double time,
 
     if(frame_index-- == 0)
     {
-      frame_index = NUM_FRAMES - 1;
+      frame_index = inst->num_frames - 1;
     }
   }
 
-  if(++inst->framebuffer_index == NUM_FRAMES)
+  if(++inst->framebuffer_index == inst->num_frames)
   {
     inst->framebuffer_index = 0;
   }
 
-  memcpy(inst->previous_frames[inst->framebuffer_index], inframe,
-         frame_size * sizeof(uint32_t));
+  memcpy(inst->previous_frames[inst->framebuffer_index], inframe, frame_bytes);
 }
