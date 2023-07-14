@@ -18,6 +18,7 @@
  */
 
 #include <stdlib.h>
+#include <stdio.h>
 #if defined(_MSC_VER)
 #define _USE_MATH_DEFINES
 #endif /* _MSC_VER */
@@ -31,9 +32,11 @@
 
 typedef struct moti0nblur_instance
 {
-  uint32_t previous_frames[NUM_FRAMES];
+  unsigned int width;
+  unsigned int height;
+  uint32_t* previous_frames[NUM_FRAMES];
   float frame_ratios[NUM_FRAMES];
-  unsigned int ringbuffer_index;
+  unsigned int framebuffer_index;
 } moti0nblur_instance_t;
 
 /* Calculate the frame ratios. */
@@ -44,6 +47,7 @@ void update_ratios(moti0nblur_instance_t *inst)
   for(i = 0; i < NUM_FRAMES; ++i)
   {
     inst->frame_ratios[i] = current_ratio;
+    printf("RATIO %d: %f", i, inst->frame_ratios[i]);
     current_ratio = current_ratio / 2.0f;
   }
 }
@@ -66,7 +70,7 @@ void f0r_get_plugin_info(f0r_plugin_info_t* info)
   info->major_version = 0;
   info->minor_version = 0;
   info->num_params =  1;
-  info->explanation = "Shifts the hue of a source image";
+  info->explanation = "";
 }
 
 void f0r_get_param_info(f0r_param_info_t* info, int param_index)
@@ -74,9 +78,9 @@ void f0r_get_param_info(f0r_param_info_t* info, int param_index)
   switch(param_index)
   {
   case 0:
-    info->name = "Hue";
+    info->name = "Name";
     info->type = F0R_PARAM_DOUBLE;
-    info->explanation = "The shift value";
+    info->explanation = "";
     break;
   }
 }
@@ -84,15 +88,22 @@ void f0r_get_param_info(f0r_param_info_t* info, int param_index)
 f0r_instance_t f0r_construct(unsigned int width, unsigned int height)
 {
   moti0nblur_instance_t* inst = (moti0nblur_instance_t*)calloc(1, sizeof(*inst));
-  inst->width = width; inst->height = height;
-  /* init transformation matrix */
-  inst->hueshift = 0;
+  inst->framebuffer_index = 0;
+  inst->width = width;
+  inst->height = height;
   update_ratios(inst);
+  for(unsigned int i = 0; i < NUM_FRAMES; ++i) {
+    inst->previous_frames[i] = (uint32_t*)malloc(width * height * sizeof(uint32_t));
+  }
   return (f0r_instance_t)inst;
 }
 
 void f0r_destruct(f0r_instance_t instance)
 {
+  moti0nblur_instance_t* inst = (moti0nblur_instance_t*)instance;
+  for(unsigned int i = 0; i < NUM_FRAMES; ++i) {
+    free(inst->previous_frames[i]);
+  }
   free(instance);
 }
 
@@ -101,20 +112,6 @@ void f0r_set_param_value(f0r_instance_t instance,
 {
   assert(instance);
   moti0nblur_instance_t* inst = (moti0nblur_instance_t*)instance;
-
-  switch(param_index)
-  {
-    int val;
-  case 0:
-    /* constrast */
-    val = (int) (*((double*)param) * 360.0); /* remap to [0, 360] */
-    if (val != inst->hueshift)
-    {
-      inst->hueshift = val;
-      update_ratios(inst);
-    }
-    break;
-  }
 }
 
 void f0r_get_param_value(f0r_instance_t instance,
@@ -122,13 +119,6 @@ void f0r_get_param_value(f0r_instance_t instance,
 {
   assert(instance);
   moti0nblur_instance_t* inst = (moti0nblur_instance_t*)instance;
-  
-  switch(param_index)
-  {
-  case 0:
-    *((double*)param) = (double) (inst->hueshift / 360.0);
-    break;
-  }
 }
 
 void f0r_update(f0r_instance_t instance, double time,
@@ -136,10 +126,44 @@ void f0r_update(f0r_instance_t instance, double time,
 {
   assert(instance);
   moti0nblur_instance_t* inst = (moti0nblur_instance_t*)instance;
-  unsigned int len = inst->width * inst->height;
-  
-  memcpy(outframe, inframe, len*sizeof(uint32_t));
-  applymatrix((unsigned long*)outframe, inst->mat, len);
+
+  unsigned int frames_processed = 0;
+  unsigned int frame_index = inst->framebuffer_index;
+  const unsigned char* pixel = 0;
+  double r, g, b, a = 0.0;
+  const unsigned int frame_size = inst->width * inst->height;
+  memcpy(outframe, inframe, frame_size * sizeof(uint32_t));
+  for(frames_processed = 0; frames_processed < NUM_FRAMES; ++frames_processed)
+  {
+    for(unsigned int i = 0; i < frame_size; ++i)
+    {
+      const uint32_t* old_frame = inst->previous_frames[frame_index];
+      pixel = (const unsigned char*)(old_frame + i);
+      r = (double)(old_frame[i] >> 24 & 0x000000ff);
+      g = (double)(old_frame[i] >> 16 & 0x000000ff);
+      b = (double)(old_frame[i] >> 8 & 0x000000ff);
+      a = (double)(old_frame[i] & 0x000000ff);
+
+      uint32_t out_pixel = (
+        ((unsigned char)(r * inst->frame_ratios[frames_processed]) << 24) +
+        ((unsigned char)(g * inst->frame_ratios[frames_processed]) << 16) +
+        ((unsigned char)(b * inst->frame_ratios[frames_processed]) << 8) +
+        ((unsigned char)(a * inst->frame_ratios[frames_processed]))
+      );
+      outframe[i] += out_pixel;
+    }
+
+    if(frame_index-- == 0)
+    {
+      frame_index = NUM_FRAMES - 1;
+    }
+
+    if(++inst->framebuffer_index == NUM_FRAMES)
+    {
+      inst->framebuffer_index = 0;
+    }
+
+    memcpy(inst->previous_frames[inst->framebuffer_index], inframe,
+          frame_size * sizeof(uint32_t));
+  }
 }
-
-
