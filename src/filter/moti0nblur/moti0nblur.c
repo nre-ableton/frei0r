@@ -47,7 +47,7 @@ void update_ratios(moti0nblur_instance_t *inst)
   for(i = 0; i < NUM_FRAMES; ++i)
   {
     inst->frame_ratios[i] = current_ratio;
-    printf("RATIO %d: %f", i, inst->frame_ratios[i]);
+    printf("RATIO %d: %f\n", i, inst->frame_ratios[i]);
     current_ratio = current_ratio / 2.0f;
   }
 }
@@ -138,7 +138,6 @@ void f0r_update(f0r_instance_t instance, double time,
     for(unsigned int i = 0; i < frame_size; ++i)
     {
       const uint32_t* old_frame = inst->previous_frames[frame_index];
-      pixel = (const unsigned char*)(old_frame + i);
       r = (double)(old_frame[i] >> 24 & 0x000000ff);
       g = (double)(old_frame[i] >> 16 & 0x000000ff);
       b = (double)(old_frame[i] >> 8 & 0x000000ff);
@@ -148,7 +147,7 @@ void f0r_update(f0r_instance_t instance, double time,
         ((unsigned char)(r * inst->frame_ratios[frames_processed]) << 24) +
         ((unsigned char)(g * inst->frame_ratios[frames_processed]) << 16) +
         ((unsigned char)(b * inst->frame_ratios[frames_processed]) << 8) +
-        ((unsigned char)(a * inst->frame_ratios[frames_processed]))
+        0x000000ff
       );
       outframe[i] += out_pixel;
     }
