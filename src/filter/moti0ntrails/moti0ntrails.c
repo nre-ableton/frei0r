@@ -152,13 +152,13 @@ void f0r_destruct(f0r_instance_t instance)
 //stretch [0...1] to parameter range [min...max] linear
 float map_value_forward(double v, float min, float max)
 {
-	return min+(max-min)*v;
+	return (float)(min + (max - min) * v);
 }
 
 //collapse from parameter range [min...max] to [0...1] linear
 double map_value_backward(float v, float min, float max)
 {
-	return (v-min)/(max-min);
+	return (v - min) / (max - min);
 }
 
 void f0r_set_param_value(f0r_instance_t instance, 
@@ -169,7 +169,7 @@ void f0r_set_param_value(f0r_instance_t instance,
   switch(param_index)
   {
   case 0:
-    inst->num_frames = map_value_forward(*((double*)param), MAX_NUM_FRAMES, 0);
+    inst->num_frames = map_value_forward(*((double*)param), 0, MAX_NUM_FRAMES);
     update_ratios(instance);
     break;
   case 1:
@@ -218,7 +218,6 @@ void f0r_update(f0r_instance_t instance, double time,
 
   unsigned int frames_processed = 0;
   unsigned int frame_index = inst->framebuffer_index;
-  const unsigned char* pixel = 0;
   double r, g, b, a = 0.0;
   double r_old, g_old, b_old, a_old = 0.0;
   double r_blend, g_blend, b_blend, a_blend = 0.0;
