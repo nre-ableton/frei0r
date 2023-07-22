@@ -197,12 +197,12 @@ static uint32_t average(const uint32_t* start,
     }
     p += xsize;
   }
-  
-  avg_blue = (blue / (bxsize*bysize)) & 0xff;
-  avg_green = (green / (bxsize*bysize)) & 0xff;
-  avg_red = (red / (bxsize*bysize)) & 0xff;
-  avg_alpha = (alpha / (bxsize*bysize)) & 0xff;
-  
+
+  avg_blue = ((blue / (bxsize*bysize)) >> 6) << 6;
+  avg_green = ((green / (bxsize*bysize)) >> 6) << 6;
+  avg_red = ((red / (bxsize*bysize)) >> 6) << 6;
+  avg_alpha = 0x00;
+
   return (avg_blue << 24) + (avg_green << 16) + (avg_red << 8) + avg_alpha;
 }
 
