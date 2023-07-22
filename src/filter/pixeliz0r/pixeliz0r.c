@@ -46,18 +46,18 @@ void f0r_get_plugin_info(f0r_plugin_info_t* pixelizerInfo)
 void f0r_get_param_info(f0r_param_info_t* info, int param_index)
 {
   switch(param_index)
-    {
-    case 0:
-      info->name = "Block width";
-      info->type = F0R_PARAM_DOUBLE;
-      info->explanation = "Horizontal size of one 'pixel'";
-      break;
-    case 1:
-      info->name = "Block height";
-      info->type = F0R_PARAM_DOUBLE;
-      info->explanation = "Vertical size of one 'pixel'";
-      break;      
-    }
+  {
+  case 0:
+    info->name = "Block width";
+    info->type = F0R_PARAM_DOUBLE;
+    info->explanation = "Horizontal size of one 'pixel'";
+    break;
+  case 1:
+    info->name = "Block height";
+    info->type = F0R_PARAM_DOUBLE;
+    info->explanation = "Vertical size of one 'pixel'";
+    break;
+  }
 }
 
 f0r_instance_t f0r_construct(unsigned int width, unsigned int height)
@@ -80,16 +80,16 @@ void f0r_set_param_value(f0r_instance_t instance,
   pixelizer_instance_t* inst = (pixelizer_instance_t*)instance;
   
   switch(param_index)
-    {
-    case 0:
-      // scale to [1..width]
-      inst->block_size_x =  MAX(1 + ( *((double*)param) * (inst->width/2)), 1);
-      break;
-    case 1:
-      // scale to [1..height]
-      inst->block_size_y =  MAX(1 + ( *((double*)param) * (inst->height/2)), 1);
-      break;
-    }  
+  {
+  case 0:
+    // scale to [1..width]
+    inst->block_size_x =  MAX(1 + ( *((double*)param) * (inst->width/2)), 1);
+    break;
+  case 1:
+    // scale to [1..height]
+    inst->block_size_y =  MAX(1 + ( *((double*)param) * (inst->height/2)), 1);
+    break;
+  }  
 }
 
 void f0r_get_param_value(f0r_instance_t instance,
@@ -99,16 +99,16 @@ void f0r_get_param_value(f0r_instance_t instance,
   pixelizer_instance_t* inst = (pixelizer_instance_t*)instance;
   
   switch(param_index)
-    {
-    case 0:
-      // scale back to [0..1]
-      *((double*)param) = (double)(inst->block_size_x-1)/(inst->width/2);
-      break;
-    case 1:
-      // scale back to [0..1]
-      *((double*)param) = (double)(inst->block_size_y-1)/(inst->height/2);
-      break;
-    }  
+  {
+  case 0:
+    // scale back to [0..1]
+    *((double*)param) = (double)(inst->block_size_x-1)/(inst->width/2);
+    break;
+  case 1:
+    // scale back to [0..1]
+    *((double*)param) = (double)(inst->block_size_y-1)/(inst->height/2);
+    break;
+  }  
 }
 
 void f0r_update(f0r_instance_t instance, double time,
@@ -144,32 +144,32 @@ void f0r_update(f0r_instance_t instance, double time,
     {	  
       offset = yi*bsizey*xsize;
       for (xi = 0; xi < blocks_x; ++xi)
-	{
-	  uint32_t col = average(src + offset, bsizex, bsizey, xsize);
-	  fill_block(dst + offset, bsizex, bsizey, xsize, col);
-	  offset += bsizex;
-	}
+      {
+        uint32_t col = average(src + offset, bsizex, bsizey, xsize);
+        fill_block(dst + offset, bsizex, bsizey, xsize, col);
+        offset += bsizex;
+      }
       if (xrest > 0)
-	{
-	  uint32_t col = average(src + offset, xrest, bsizey, xsize);
-	  fill_block(dst + offset, xrest, bsizey, xsize, col);
-	}
+      {
+        uint32_t col = average(src + offset, xrest, bsizey, xsize);
+        fill_block(dst + offset, xrest, bsizey, xsize, col);
+      }
     }
   // check for last line
   if (yrest > 0)
     {
       offset = blocks_y*bsizey*xsize;
       for (xi = 0; xi < blocks_x; ++xi)
-	{
-	  uint32_t col = average(src + offset, bsizex, yrest, xsize);
-	  fill_block(dst + offset, bsizex, yrest, xsize, col);
-	  offset += bsizex;
-	}
+      {
+        uint32_t col = average(src + offset, bsizex, yrest, xsize);
+        fill_block(dst + offset, bsizex, yrest, xsize, col);
+        offset += bsizex;
+      }
       if (xrest > 0)
-	{
-	  uint32_t col = average(src + offset, xrest, yrest, xsize);
-	  fill_block(dst + offset, xrest, yrest, xsize, col);
-	}
+      {
+        uint32_t col = average(src + offset, xrest, yrest, xsize);
+        fill_block(dst + offset, xrest, yrest, xsize, col);
+      }
     } 
 }
 
@@ -185,18 +185,18 @@ static uint32_t average(const uint32_t* start,
   uint32_t c;
   
   for (y = 0; y < bysize; ++y)
+  {
+    pp = p;
+    for (x = 0; x < bxsize; ++x)
     {
-      pp = p;
-      for (x = 0; x < bxsize; ++x)
-	{
-	  c = *(pp++);
-          alpha += (c & 0xff000000) >> 24;
-	  red   += (c & 0x00ff0000) >> 16;
-	  green += (c & 0x0000ff00) >> 8;
-	  blue  += (c & 0x000000ff);
-	}
-      p += xsize;
+      c = *(pp++);
+      alpha += (c & 0xff000000) >> 24;
+      red   += (c & 0x00ff0000) >> 16;
+      green += (c & 0x0000ff00) >> 8;
+      blue  += (c & 0x000000ff);
     }
+    p += xsize;
+  }
   
   avg_alpha = (alpha / (bxsize*bysize)) & 0xff;
   avg_red   = (red   / (bxsize*bysize)) & 0xff;
