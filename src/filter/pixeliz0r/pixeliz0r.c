@@ -190,20 +190,20 @@ static uint32_t average(const uint32_t* start,
     for (x = 0; x < bxsize; ++x)
     {
       c = *(pp++);
-      alpha += (c & 0xff000000) >> 24;
-      red   += (c & 0x00ff0000) >> 16;
-      green += (c & 0x0000ff00) >> 8;
-      blue  += (c & 0x000000ff);
+      blue += (c & 0xff000000) >> 24;
+      green += (c & 0x00ff0000) >> 16;
+      red += (c & 0x0000ff00) >> 8;
+      alpha += (c & 0x000000ff);
     }
     p += xsize;
   }
   
-  avg_alpha = (alpha / (bxsize*bysize)) & 0xff;
-  avg_red   = (red   / (bxsize*bysize)) & 0xff;
+  avg_blue = (blue / (bxsize*bysize)) & 0xff;
   avg_green = (green / (bxsize*bysize)) & 0xff;
-  avg_blue  = (blue  / (bxsize*bysize)) & 0xff;
+  avg_red = (red / (bxsize*bysize)) & 0xff;
+  avg_alpha = (alpha / (bxsize*bysize)) & 0xff;
   
-  return (avg_alpha << 24) + (avg_red << 16) + (avg_green << 8) + avg_blue;
+  return (avg_blue << 24) + (avg_green << 16) + (avg_red << 8) + avg_alpha;
 }
 
 static void fill_block(uint32_t* start, int bxsize, int bysize,
